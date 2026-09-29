@@ -36,41 +36,34 @@ import type {
   TaskDtoPriority,
   TaskDtoStatus,
 } from '../lib/api-client/models';
-
 const taskFormSchema = z.object({
   title: z
     .string()
     .min(3, 'O título deve ter no mínimo 3 caracteres.')
     .max(150, 'O título deve ter no máximo 150 caracteres.'),
   description: z.string().max(1000, 'Máximo de 1000 caracteres.').optional(),
+  category: z.string().max(100, 'Máximo de 100 caracteres.').optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   dueDate: z.string().optional(),
 });
-
 type TaskFormValues = z.infer<typeof taskFormSchema>;
-
 const editTaskFormSchema = taskFormSchema.extend({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
 });
-
 type EditTaskFormValues = z.infer<typeof editTaskFormSchema>;
-
 export function TasksPage() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const page = Number(searchParams.get('page')) || 1;
   const search = searchParams.get('search') || '';
   const statusFilter = searchParams.get('status') || '';
   const priorityFilter = searchParams.get('priority') || '';
   const sortBy = searchParams.get('sortBy') || 'createdAt';
   const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
-
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskDto | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
   // Update URL Search Params helper
   const updateParams = (newParams: Record<string, string | number | undefined>) => {
     const updated = new URLSearchParams(searchParams);
@@ -83,7 +76,6 @@ export function TasksPage() {
     }
     setSearchParams(updated);
   };
-
   // Fetch Tasks with TanStack Query
   const { data: response, isLoading, isError, refetch } = useQuery({
     queryKey: ['tasks', { page, search, statusFilter, priorityFilter, sortBy, sortOrder }],
@@ -100,14 +92,11 @@ export function TasksPage() {
       return res.data;
     },
   });
-
   const paginatedData = response && 'data' in (response as PaginatedTasksResponseDto)
     ? (response as PaginatedTasksResponseDto)
     : null;
-
   const tasks: TaskDto[] = paginatedData?.data || [];
   const meta = paginatedData?.meta || { page: 1, pageSize: 8, total: 0, totalPages: 1 };
-
   // Form for Creating
   const {
     register: registerCreate,
@@ -119,16 +108,17 @@ export function TasksPage() {
     defaultValues: {
       title: '',
       description: '',
+      category: '',
       priority: 'MEDIUM',
       dueDate: '',
     },
   });
-
   const createMutation = useMutation({
     mutationFn: async (data: TaskFormValues) => {
       const res = await tasksControllerCreate({
         title: data.title,
         description: data.description || undefined,
+        category: data.category || undefined,
         priority: data.priority as any,
         dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
       });
@@ -152,7 +142,6 @@ export function TasksPage() {
       setFeedback({ type: 'error', message: msg });
     },
   });
-
   // Edit / Status Update Mutation
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -163,6 +152,7 @@ export function TasksPage() {
       data: {
         title?: string;
         description?: string;
+        category?: string;
         priority?: TaskDtoPriority;
         status?: TaskDtoStatus;
         dueDate?: string;
@@ -184,7 +174,6 @@ export function TasksPage() {
       setFeedback({ type: 'error', message: msg });
     },
   });
-
   // Delete Mutation (Soft Delete)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -202,7 +191,6 @@ export function TasksPage() {
       setFeedback({ type: 'error', message: msg });
     },
   });
-
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'URGENT':
@@ -216,7 +204,6 @@ export function TasksPage() {
         return <Badge variant="secondary">Baixa</Badge>;
     }
   };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETED':
@@ -230,7 +217,6 @@ export function TasksPage() {
         return <Badge variant="outline">Pendente</Badge>;
     }
   };
-
   return (
     <div className="space-y-6">
       {/* Header and Actions */}
@@ -244,13 +230,11 @@ export function TasksPage() {
             Exemplo didático com regras de negócio, ownership, busca, paginação e remoção lógica.
           </p>
         </div>
-
         <Button onClick={() => setIsCreateOpen(true)} className="gap-1.5 shrink-0">
           <Plus className="h-4 w-4" />
           Nova Tarefa
         </Button>
       </div>
-
       {feedback && (
         <ActionFeedback
           type={feedback.type}
@@ -258,7 +242,6 @@ export function TasksPage() {
           onClose={() => setFeedback(null)}
         />
       )}
-
       {/* Filter and Search Controls */}
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -274,7 +257,6 @@ export function TasksPage() {
                 className="flex h-10 w-full rounded-md border border-slate-300 dark:border-slate-700 bg-transparent pl-9 pr-3 py-2 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               />
             </div>
-
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -287,7 +269,6 @@ export function TasksPage() {
               <option value="COMPLETED">Concluída</option>
               <option value="CANCELLED">Cancelada</option>
             </select>
-
             {/* Priority Filter */}
             <select
               value={priorityFilter}
@@ -300,7 +281,6 @@ export function TasksPage() {
               <option value="HIGH">Alta</option>
               <option value="URGENT">Urgente</option>
             </select>
-
             {/* Sorting */}
             <select
               value={`${sortBy}:${sortOrder}`}
@@ -318,7 +298,6 @@ export function TasksPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Task List / State Views */}
       {isLoading ? (
         <LoadingState message="Carregando tarefas..." />
@@ -357,8 +336,8 @@ export function TasksPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tasks.map((task) => {
               const desc = typeof task.description === 'string' ? task.description : '';
+              const category = typeof task.category === 'string' ? task.category : '';
               const dueStr = typeof task.dueDate === 'string' ? task.dueDate : '';
-
               return (
                 <Card
                   key={task.id}
@@ -375,14 +354,17 @@ export function TasksPage() {
                           {getStatusBadge(task.status)}
                         </div>
                       </div>
-
                       {desc && (
                         <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                           {desc}
                         </p>
                       )}
+                      {category && (
+                        <div>
+                          <Badge variant="secondary">{category}</Badge>
+                        </div>
+                      )}
                     </div>
-
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
                       <div className="flex items-center gap-3">
                         {dueStr && (
@@ -397,7 +379,6 @@ export function TasksPage() {
                           </span>
                         )}
                       </div>
-
                       {/* Action buttons */}
                       <div className="flex items-center gap-1.5">
                         {task.status !== 'COMPLETED' ? (
@@ -435,7 +416,6 @@ export function TasksPage() {
                             <span className="text-xs">Reabrir</span>
                           </Button>
                         )}
-
                         <Button
                           size="sm"
                           variant="ghost"
@@ -445,7 +425,6 @@ export function TasksPage() {
                         >
                           <Edit2 className="h-3.5 w-3.5 text-slate-500" />
                         </Button>
-
                         <Button
                           size="sm"
                           variant="ghost"
@@ -467,7 +446,6 @@ export function TasksPage() {
               );
             })}
           </div>
-
           {/* Pagination */}
           <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500">
             <div>
@@ -499,7 +477,6 @@ export function TasksPage() {
           </div>
         </div>
       )}
-
       {/* Create Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
@@ -510,14 +487,12 @@ export function TasksPage() {
             >
               <X className="h-5 w-5" />
             </button>
-
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
               Nova Tarefa de Referência
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               Crie uma tarefa demonstrando regras de negócio e validação por formulário.
             </p>
-
             <form
               onSubmit={handleSubmitCreate((data) => {
                 setFeedback(null);
@@ -531,7 +506,6 @@ export function TasksPage() {
                 {...registerCreate('title')}
                 error={createErrors.title?.message}
               />
-
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Descrição
@@ -546,7 +520,12 @@ export function TasksPage() {
                   <span className="text-xs text-red-500">{createErrors.description.message}</span>
                 )}
               </div>
-
+              <Input
+                label="Categoria"
+                placeholder="Ex.: Faculdade, Trabalho, Pessoal"
+                {...registerCreate('category')}
+                error={createErrors.category?.message}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -562,7 +541,6 @@ export function TasksPage() {
                     <option value="URGENT">Urgente</option>
                   </select>
                 </div>
-
                 <Input
                   label="Data Limite"
                   type="date"
@@ -570,7 +548,6 @@ export function TasksPage() {
                   error={createErrors.dueDate?.message}
                 />
               </div>
-
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Button
                   type="button"
@@ -588,7 +565,6 @@ export function TasksPage() {
           </div>
         </div>
       )}
-
       {/* Edit Modal */}
       {editingTask && (
         <EditTaskModal
@@ -604,7 +580,6 @@ export function TasksPage() {
     </div>
   );
 }
-
 function EditTaskModal({
   task,
   onClose,
@@ -618,8 +593,8 @@ function EditTaskModal({
 }) {
   const isCompleted = task.status === 'COMPLETED';
   const rawDesc = typeof task.description === 'string' ? task.description : '';
+  const rawCategory = typeof task.category === 'string' ? task.category : '';
   const rawDue = typeof task.dueDate === 'string' ? (task.dueDate as unknown as string).split('T')[0] : '';
-
   const {
     register,
     handleSubmit,
@@ -629,12 +604,12 @@ function EditTaskModal({
     defaultValues: {
       title: task.title,
       description: rawDesc,
+      category: rawCategory,
       priority: task.priority as any,
       status: task.status as any,
       dueDate: rawDue,
     },
   });
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-md w-full p-6 relative">
@@ -644,14 +619,12 @@ function EditTaskModal({
         >
           <X className="h-5 w-5" />
         </button>
-
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
           Editar Tarefa
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
           Atualize os campos ou status da tarefa.
         </p>
-
         {isCompleted && (
           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 rounded-lg flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -660,12 +633,12 @@ function EditTaskModal({
             </span>
           </div>
         )}
-
         <form
           onSubmit={handleSubmit((data) => {
             onSubmit({
               title: data.title,
               description: data.description || undefined,
+              category: data.category || undefined,
               priority: data.priority,
               status: data.status,
               dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
@@ -679,7 +652,6 @@ function EditTaskModal({
             {...register('title')}
             error={errors.title?.message}
           />
-
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Descrição
@@ -692,6 +664,13 @@ function EditTaskModal({
             />
           </div>
 
+          <Input
+              label="Categoria"
+              placeholder="Ex.: Faculdade, Trabalho, Pessoal"
+              disabled={isCompleted}
+              {...register('category')}
+              error={errors.category?.message}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -707,7 +686,6 @@ function EditTaskModal({
                 <option value="CANCELLED">Cancelada</option>
               </select>
             </div>
-
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Prioridade
@@ -724,7 +702,6 @@ function EditTaskModal({
               </select>
             </div>
           </div>
-
           <Input
             label="Data Limite"
             type="date"
@@ -732,7 +709,6 @@ function EditTaskModal({
             {...register('dueDate')}
             error={errors.dueDate?.message}
           />
-
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancelar
